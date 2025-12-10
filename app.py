@@ -114,45 +114,56 @@ def main():
         resumen = df_result.groupby("Cluster")[columnas_seleccionadas].mean()
         st.dataframe(resumen.style.format("{:.2f}"))
 
-        # etiquetas interpretables por cluster basadas en promedios
+            # etiquetas interpretables por cluster basadas en promedios
         promedio_total = resumen.mean().mean()
         labels_clusters = {}
+        descripciones_clusters = {}
+
         for cluster_id in resumen.index:
             fila_cluster = resumen.loc[cluster_id]
             promedio_cluster = fila_cluster.mean()
 
             if promedio_cluster >= promedio_total * 1.10:
                 etiqueta = "Estudiantes de alto compromiso"
+                descripcion_simple = (
+                    "son estudiantes que usan mucho la plataforma, "
+                    "participan con frecuencia y suelen obtener buenas notas."
+                )
             elif promedio_cluster <= promedio_total * 0.90:
                 etiqueta = "Estudiantes en riesgo academico"
+                descripcion_simple = (
+                    "son estudiantes con menor uso de la plataforma, "
+                    "menos tareas entregadas o notas mas bajas. "
+                    "Requieren acompanamiento y apoyo adicional."
+                )
             else:
                 etiqueta = "Estudiantes intermedios"
+                descripcion_simple = (
+                    "son estudiantes con un uso y rendimiento medios: "
+                    "cumplen la mayoria de las actividades y se mantienen "
+                    "cerca del promedio del curso."
+                )
 
-            labels_clusters[int(cluster_id)] = etiqueta
+            labels_clusters[cluster_id] = etiqueta
+            descripciones_clusters[cluster_id] = descripcion_simple
+
 
         # --- Nueva seccion: inferencia para un estudiante nuevo ---
         st.subheader("Ingresar un nuevo estudiante para inferencia")
 
-        st.markdown(
-            "Completa los valores de un estudiante hipotetico para ver "
-            "a que cluster seria asignado segun el modelo entrenado."
-        )
+        # Formulario para capturar los datos de un estudiante hipotetico
+        with st.form("nuevo_estudiante"):
+            st.write("Complete los valores para un estudiante hipotetico:")
 
-        with st.form("form_nuevo_estudiante"):
+            # Diccionario donde se guardan los valores ingresados
             valores_nuevo = {}
-
-            st.write("Ingresa las variables numericas seleccionadas:")
-
             for col in columnas_seleccionadas:
-                min_val = float(df[col].min())
-                max_val = float(df[col].max())
-                mean_val = float(df[col].mean())
-
+                # usamos como valor por defecto el promedio de la columna
+                valor_defecto = float(df_result[col].mean())
                 valores_nuevo[col] = st.number_input(
                     f"{col}",
-                    min_value=min_val,
-                    max_value=max_val,
-                    value=mean_val,
+                    value=valor_defecto,
+                    key=f"nuevo_{col}",
                 )
 
             submit_nuevo = st.form_submit_button("Calcular cluster")
@@ -167,7 +178,17 @@ def main():
             X_nuevo_pca = pca.transform(X_nuevo_scaled)
             cluster_nuevo = int(modelo.predict(X_nuevo_pca)[0])
 
-            st.success(f"El nuevo estudiante fue asignado al cluster {cluster_nuevo}")
+            # Mensaje principal pensado para todo publico
+            if cluster_nuevo in labels_clusters:
+                etiqueta = labels_clusters[cluster_nuevo]
+                st.success(
+                    f"El nuevo estudiante se parece al grupo: {etiqueta} "
+                    f"(cluster {cluster_nuevo})."
+                )
+            else:
+                st.success(
+                    f"El nuevo estudiante fue asignado al cluster {cluster_nuevo}."
+                )
 
             # ---- Interpretacion automatica del cluster ----
             if cluster_nuevo in labels_clusters:
@@ -176,6 +197,13 @@ def main():
                 st.markdown(
                     f"### Cluster {cluster_nuevo} — {labels_clusters[cluster_nuevo]}"
                 )
+
+                # Explicacion en lenguaje sencillo
+                if cluster_nuevo in descripciones_clusters:
+                    st.info(
+                        "En palabras simples, esto significa que "
+                        f"{descripciones_clusters[cluster_nuevo]}"
+                    )
 
                 st.write("Este cluster se caracteriza por los siguientes promedios:")
 
@@ -196,10 +224,6 @@ def main():
                     "PCA2": float(X_nuevo_pca[0, 1]),
                 }
             )
-
-        st.subheader("Tabla de ejemplo con cluster asignado")
-        st.dataframe(df_result.head(20))
-
 
 if __name__ == "__main__":
     main()
