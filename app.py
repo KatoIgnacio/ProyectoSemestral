@@ -99,22 +99,17 @@ def main():
             f"Inercia del modelo K-Means (distancia interna total): {modelo.inertia_:.2f}"
         )
 
-        st.subheader("Grafico PCA por cluster")
+        st.subheader("Grafico de dispersion (PCA1 y PCA2)")
         st.markdown(
-            "Cada punto representa un estudiante proyectado en dos componentes principales (PCA1 y PCA2). "
-            "Los colores indican el cluster asignado por K-Means."
+            "Los resultados se visualizan en un plano formado por las dos primeras componentes principales "
+            "(PCA1 y PCA2). Cada punto representa un estudiante y el color indica el cluster asignado."
         )
         st.scatter_chart(df_result, x="PCA1", y="PCA2", color="Cluster")
 
-        st.subheader("Cantidad de estudiantes por cluster")
-        conteo = df_result["Cluster"].value_counts().sort_index()
-        st.bar_chart(conteo)
-
-        st.subheader("Resumen por cluster (promedios)")
+        # resumen de variables numericas por cluster
         resumen = df_result.groupby("Cluster")[columnas_seleccionadas].mean()
-        st.dataframe(resumen.style.format("{:.2f}"))
 
-            # etiquetas interpretables por cluster basadas en promedios
+        # etiquetas interpretables por cluster basadas en promedios
         promedio_total = resumen.mean().mean()
         labels_clusters = {}
         descripciones_clusters = {}
@@ -147,6 +142,35 @@ def main():
             labels_clusters[cluster_id] = etiqueta
             descripciones_clusters[cluster_id] = descripcion_simple
 
+        # --- Tabla resumen de clusters ---
+        st.subheader("Tabla resumen de clusters")
+        st.caption(
+            "Resumen general de cada cluster, indicando su etiqueta interpretativa "
+            "y la cantidad de estudiantes asignados."
+        )
+
+        # conteo de estudiantes por cluster
+        conteo_clusters = df_result["Cluster"].value_counts().sort_index()
+
+        # DataFrame con Cluster, Etiqueta y Cantidad de estudiantes
+        tabla_clusters = pd.DataFrame(
+            {
+                "Cluster": conteo_clusters.index,
+                "Etiqueta": [
+                    labels_clusters.get(i, f"Cluster {i}") for i in conteo_clusters.index
+                ],
+                "Cantidad_estudiantes": conteo_clusters.values,
+            }
+        )
+
+        st.dataframe(tabla_clusters)
+
+        st.subheader("Tabla de caracteristicas promedio por cluster")
+        st.caption(
+            "La tabla muestra, para cada cluster, el promedio de las variables seleccionadas, "
+            "lo que permite describir el perfil tipico de cada grupo."
+        )
+        st.dataframe(resumen.style.format("{:.2f}"))
 
         # --- Nueva seccion: inferencia para un estudiante nuevo ---
         st.subheader("Ingresar un nuevo estudiante para inferencia")
