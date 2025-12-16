@@ -113,6 +113,7 @@ def main():
         promedio_total = resumen.mean().mean()
         labels_clusters = {}
         descripciones_clusters = {}
+        recomendaciones_clusters = {}
 
         for cluster_id in resumen.index:
             fila_cluster = resumen.loc[cluster_id]
@@ -124,6 +125,11 @@ def main():
                     "son estudiantes que usan mucho la plataforma, "
                     "participan con frecuencia y suelen obtener buenas notas."
                 )
+                recomendaciones = [
+                    "Mantener sus habitos de estudio y uso de la plataforma.",
+                    "Ofrecer actividades de extension o desafios adicionales.",
+                    "Invitarles a apoyar a otros estudiantes en foros o tutorias.",
+                ]
             elif promedio_cluster <= promedio_total * 0.90:
                 etiqueta = "Estudiantes en riesgo academico"
                 descripcion_simple = (
@@ -131,6 +137,11 @@ def main():
                     "menos tareas entregadas o notas mas bajas. "
                     "Requieren acompanamiento y apoyo adicional."
                 )
+                recomendaciones = [
+                    "Contactar al estudiante para conocer sus dificultades.",
+                    "Proponer un plan de estudio guiado con metas semanales.",
+                    "Enviar recordatorios de tareas y recursos clave.",
+                ]
             else:
                 etiqueta = "Estudiantes intermedios"
                 descripcion_simple = (
@@ -138,39 +149,84 @@ def main():
                     "cumplen la mayoria de las actividades y se mantienen "
                     "cerca del promedio del curso."
                 )
+                recomendaciones = [
+                    "Invitar al estudiante a aumentar su participacion.",
+                    "Reforzar el uso de foros y material extra.",
+                    "Monitorear su progreso en las proximas evaluaciones.",
+                ]
 
             labels_clusters[cluster_id] = etiqueta
             descripciones_clusters[cluster_id] = descripcion_simple
+            recomendaciones_clusters[cluster_id] = recomendaciones
 
-        # --- Tabla resumen de clusters ---
-        st.subheader("Tabla resumen de clusters")
-        st.caption(
-            "Resumen general de cada cluster, indicando su etiqueta interpretativa "
-            "y la cantidad de estudiantes asignados."
+
+        # --- Resumen interpretativo de los clusters ---
+        st.subheader("Resumen interpretativo de los clusters")
+        st.write(
+            "Descripcion en lenguaje simple de cada cluster, pensada para publico no tecnico."
         )
 
-        # conteo de estudiantes por cluster
-        conteo_clusters = df_result["Cluster"].value_counts().sort_index()
+        # promedios globales para comparar
+        promedios_globales = df_result[columnas_seleccionadas].mean()
 
-        # DataFrame con Cluster, Etiqueta y Cantidad de estudiantes
-        tabla_clusters = pd.DataFrame(
-            {
-                "Cluster": conteo_clusters.index,
-                "Etiqueta": [
-                    labels_clusters.get(i, f"Cluster {i}") for i in conteo_clusters.index
-                ],
-                "Cantidad_estudiantes": conteo_clusters.values,
-            }
-        )
+        for cluster_id in resumen.index:
+            etiqueta = labels_clusters.get(cluster_id, f"Cluster {cluster_id}")
+            descripcion_simple = descripciones_clusters.get(cluster_id, "")
 
-        st.dataframe(tabla_clusters)
+            fila_cluster = resumen.loc[cluster_id]
 
-        st.subheader("Tabla de caracteristicas promedio por cluster")
-        st.caption(
-            "La tabla muestra, para cada cluster, el promedio de las variables seleccionadas, "
-            "lo que permite describir el perfil tipico de cada grupo."
-        )
-        st.dataframe(resumen.style.format("{:.2f}"))
+            st.markdown(f"#### Cluster {cluster_id} — {etiqueta}")
+
+            if descripcion_simple:
+                st.info(
+                    "En palabras simples, este grupo "
+                    f"{descripcion_simple}"
+                )
+
+            # variables altas, bajas y medias respecto al promedio global
+            variables_altas = []
+            variables_bajas = []
+            variables_medias = []
+
+            for col in columnas_seleccionadas:
+                valor_cluster = fila_cluster[col]
+                valor_global = promedios_globales[col]
+
+                if valor_cluster >= valor_global * 1.10:
+                    variables_altas.append(col)
+                elif valor_cluster <= valor_global * 0.90:
+                    variables_bajas.append(col)
+                else:
+                    variables_medias.append(col)
+
+            if variables_altas:
+                st.write(
+                    "- Valores mas altos que el promedio en: "
+                    + ", ".join(variables_altas)
+                    + "."
+                )
+            if variables_bajas:
+                st.write(
+                    "- Valores mas bajos que el promedio en: "
+                    + ", ".join(variables_bajas)
+                    + "."
+                )
+            if variables_medias:
+                st.write(
+                    "- Valores cercanos al promedio en: "
+                    + ", ".join(variables_medias)
+                    + "."
+                )
+
+            # recomendaciones para este cluster
+            recos = recomendaciones_clusters.get(cluster_id)
+            if recos:
+                st.write("**Recomendaciones automaticas para este grupo:**")
+                for rec in recos:
+                    st.write(f"- {rec}")
+
+            st.write("---")
+
 
         # --- Nueva seccion: inferencia para un estudiante nuevo ---
         st.subheader("Ingresar un nuevo estudiante para inferencia")
@@ -214,7 +270,7 @@ def main():
                     f"El nuevo estudiante fue asignado al cluster {cluster_nuevo}."
                 )
 
-            # ---- Interpretacion automatica del cluster ----
+            # interpretacion automatica del cluster
             if cluster_nuevo in labels_clusters:
                 fila = resumen.loc[cluster_nuevo]
 
@@ -222,7 +278,6 @@ def main():
                     f"### Cluster {cluster_nuevo} — {labels_clusters[cluster_nuevo]}"
                 )
 
-                # Explicacion en lenguaje sencillo
                 if cluster_nuevo in descripciones_clusters:
                     st.info(
                         "En palabras simples, esto significa que "
@@ -234,8 +289,14 @@ def main():
                 detalles = []
                 for col in columnas_seleccionadas:
                     detalles.append(f"- **{col}:** {fila[col]:.2f}")
-
                 st.markdown("\n".join(detalles))
+
+                # recomendaciones para este estudiante segun su grupo
+                recos = recomendaciones_clusters.get(cluster_nuevo)
+                if recos:
+                    st.markdown("**Recomendaciones sugeridas para este estudiante:**")
+                    for rec in recos:
+                        st.write(f"- {rec}")
             else:
                 st.warning(
                     "No se pudo encontrar informacion del cluster en el resumen."
@@ -248,6 +309,8 @@ def main():
                     "PCA2": float(X_nuevo_pca[0, 1]),
                 }
             )
+
+
 
 if __name__ == "__main__":
     main()
